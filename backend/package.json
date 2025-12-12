@@ -1,0 +1,35 @@
+{
+  "name": "surveillance-backend",
+  "version": "1.0.0",
+  "description": "AI Surveillance System Backend - Master Controller",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "surveillance",
+    "ai",
+    "security"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "socket.io": "^4.6.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "axios": "^1.6.0",
+    "knex": "^3.0.1",
+    "pg": "^8.11.3",
+    "redis": "^4.6.10"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0"
+  }
+}

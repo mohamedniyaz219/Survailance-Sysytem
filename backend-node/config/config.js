@@ -1,0 +1,19 @@
+const { Sequelize } = require('sequelize');
+
+const createSequelizeInstance = () => {
+  return new Sequelize(
+    process.env.DB_NAME || 'surveillance',
+    process.env.DB_USER || 'postgres',
+    process.env.DB_PASSWORD || '',
+    {
+      host: process.env.DB_HOST || 'localhost',
+      port: Number(process.env.DB_PORT) || 5432,
+      dialect: 'postgres',
+      logging: false,
+    }
+  );
+};
+
+const sequelize = createSequelizeInstance();
+
+module.exports = { sequelize, Sequelize, createSequelizeInstance };
