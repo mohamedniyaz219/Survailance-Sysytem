@@ -1,0 +1,34 @@
+# React Native / Expo
+node_modules/
+.expo/
+.expo-shared/
+android/
+ios/
+web-build/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env
+.env
+*.env
+.env.*.local
+
+# Logs / coverage
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# Editor/OS
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
+
+# Transient
+*.tmp
+*.swp
+*.swo
