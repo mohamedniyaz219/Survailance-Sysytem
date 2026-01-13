@@ -1,5 +1,5 @@
 // AI service hook: receives detections from Python, stores, and emits alerts.
-async function receiveDetection(req, res, next) {
+export async function receiveDetection(req, res, next) {
   try {
     const {
       camera_id: cameraId,
@@ -39,5 +39,3 @@ async function receiveDetection(req, res, next) {
     return next(err);
   }
 }
-
-module.exports = { receiveDetection };

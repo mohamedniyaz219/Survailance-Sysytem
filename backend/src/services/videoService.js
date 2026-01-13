@@ -1,7 +1,7 @@
-const { spawn } = require('child_process');
+import { spawn } from 'child_process';
 
 // Placeholder for spawning FFmpeg to convert RTSP to HLS/DASH/etc.
-function spawnTranscoder(rtspUrl, outputDir) {
+export function spawnTranscoder(rtspUrl, outputDir) {
   if (!rtspUrl || !outputDir) {
     throw new Error('rtspUrl and outputDir are required');
   }
@@ -17,5 +17,3 @@ function spawnTranscoder(rtspUrl, outputDir) {
   const proc = spawn('ffmpeg', args, { stdio: 'ignore' });
   return proc;
 }
-
-module.exports = { spawnTranscoder };

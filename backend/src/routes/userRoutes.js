@@ -1,11 +1,11 @@
-const express = require('express');
-const tenantResolver = require('../middlewares/tenantResolver');
-const userController = require('../controllers/userController');
+import express from 'express';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { reportIncident } from '../controllers/userController.js';
 
 const router = express.Router();
 
 router.use(tenantResolver);
 
-router.post('/report', userController.reportIncident);
+router.post('/report', reportIncident);
 
-module.exports = router;
+export default router;

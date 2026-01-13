@@ -1,9 +1,9 @@
-const express = require('express');
-const tenantResolver = require('../middlewares/tenantResolver');
-const authController = require('../controllers/authController');
+import express from 'express';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { login } from '../controllers/authController.js';
 
 const router = express.Router();
 
-router.post('/login', tenantResolver, authController.login);
+router.post('/login', tenantResolver, login);
 
-module.exports = router;
+export default router;

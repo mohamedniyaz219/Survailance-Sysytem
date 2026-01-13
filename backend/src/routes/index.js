@@ -1,10 +1,10 @@
-const express = require('express');
+import express from 'express';
 
-const authRoutes = require('./authRoutes');
-const adminRoutes = require('./adminRoutes');
-const officialRoutes = require('./officialRoutes');
-const userRoutes = require('./userRoutes');
-const aiRoutes = require('./aiRoutes');
+import authRoutes from './authRoutes.js';
+import adminRoutes from './adminRoutes.js';
+import officialRoutes from './officialRoutes.js';
+import userRoutes from './userRoutes.js';
+import aiRoutes from './aiRoutes.js';
 
 const router = express.Router();
 
@@ -18,4 +18,4 @@ router.use('/official', officialRoutes);
 router.use('/user', userRoutes);
 router.use('/ai', aiRoutes);
 
-module.exports = router;
+export default router;

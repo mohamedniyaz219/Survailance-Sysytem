@@ -1,11 +1,11 @@
-const express = require('express');
-const tenantResolver = require('../middlewares/tenantResolver');
-const aiController = require('../controllers/aiController');
+import express from 'express';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { receiveDetection } from '../controllers/aiController.js';
 
 const router = express.Router();
 
 router.use(tenantResolver);
 
-router.post('/detect', aiController.receiveDetection);
+router.post('/detect', receiveDetection);
 
-module.exports = router;
+export default router;

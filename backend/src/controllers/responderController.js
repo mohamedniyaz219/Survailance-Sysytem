@@ -1,5 +1,5 @@
 // Responder (official app) actions.
-async function getMyAlerts(req, res, next) {
+export async function getMyAlerts(req, res, next) {
   try {
     // TODO: fetch incidents for the responder's zone within tenant schema.
     return res.json({ alerts: [] });
@@ -8,7 +8,7 @@ async function getMyAlerts(req, res, next) {
   }
 }
 
-async function updateStatus(req, res, next) {
+export async function updateStatus(req, res, next) {
   try {
     const { id } = req.params;
     const { status } = req.body || {};
@@ -19,7 +19,7 @@ async function updateStatus(req, res, next) {
   }
 }
 
-async function getNavigation(req, res, next) {
+export async function getNavigation(req, res, next) {
   try {
     const { id } = req.params;
     // TODO: return coordinates/directions for the incident.
@@ -28,5 +28,3 @@ async function getNavigation(req, res, next) {
     return next(err);
   }
 }
-
-module.exports = { getMyAlerts, updateStatus, getNavigation };

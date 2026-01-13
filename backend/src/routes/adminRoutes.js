@@ -1,16 +1,16 @@
-const express = require('express');
-const authMiddleware = require('../middlewares/authMiddleware');
-const tenantResolver = require('../middlewares/tenantResolver');
-const adminController = require('../controllers/adminController');
+import express from 'express';
+import authMiddleware from '../middlewares/authMiddleware.js';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { addCamera, getAnalytics, manageOfficials, liveFeed } from '../controllers/adminController.js';
 
 const router = express.Router();
 
 router.use(authMiddleware, tenantResolver);
 
-router.post('/cameras', adminController.addCamera);
-router.get('/analytics', adminController.getAnalytics);
-router.post('/officials', adminController.manageOfficials);
-router.delete('/officials/:id', adminController.manageOfficials);
-router.get('/live-feed/:cameraId', adminController.liveFeed);
+router.post('/cameras', addCamera);
+router.get('/analytics', getAnalytics);
+router.post('/officials', manageOfficials);
+router.delete('/officials/:id', manageOfficials);
+router.get('/live-feed/:cameraId', liveFeed);
 
-module.exports = router;
+export default router;

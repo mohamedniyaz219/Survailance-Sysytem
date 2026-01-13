@@ -1,4 +1,4 @@
-const Tenant = require('../models/Tenant');
+import { Tenant } from '../models/index.js';
 
 // Resolves the tenant schema from the incoming business code header.
 async function tenantResolver(req, res, next) {
@@ -23,4 +23,4 @@ async function tenantResolver(req, res, next) {
   }
 }
 
-module.exports = tenantResolver;
+export default tenantResolver;

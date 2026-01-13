@@ -1,5 +1,5 @@
 // Admin (dashboard) actions.
-async function addCamera(req, res, next) {
+export async function addCamera(req, res, next) {
   try {
     // TODO: persist RTSP URL and location into tenant-specific Cameras table.
     return res.status(201).json({ message: 'Camera created' });
@@ -8,7 +8,7 @@ async function addCamera(req, res, next) {
   }
 }
 
-async function getAnalytics(req, res, next) {
+export async function getAnalytics(req, res, next) {
   try {
     // TODO: aggregate incident counts per type/status for the tenant.
     return res.json({ data: [] });
@@ -17,7 +17,7 @@ async function getAnalytics(req, res, next) {
   }
 }
 
-async function manageOfficials(req, res, next) {
+export async function manageOfficials(req, res, next) {
   try {
     if (req.method === 'DELETE') {
       // TODO: delete official by id scoped to tenant.
@@ -30,7 +30,7 @@ async function manageOfficials(req, res, next) {
   }
 }
 
-async function liveFeed(req, res, next) {
+export async function liveFeed(req, res, next) {
   try {
     const { cameraId } = req.params;
     // TODO: resolve HLS URL for the given camera within tenant schema.
@@ -39,5 +39,3 @@ async function liveFeed(req, res, next) {
     return next(err);
   }
 }
-
-module.exports = { addCamera, getAnalytics, manageOfficials, liveFeed };

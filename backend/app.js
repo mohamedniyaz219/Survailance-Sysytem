@@ -1,13 +1,16 @@
-const express = require('express');
-const http = require('http');
-const cors = require('cors');
-const helmet = require('helmet');
-const socketIo = require('socket.io');
-const routes = require('./src/routes');
+import 'dotenv/config';
+
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+import http from 'http';
+import { Server } from 'socket.io';
+import routes from './src/routes/index.js';
+import { initDatabase } from './config/database.js';
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: '*' } });
+const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(helmet());
@@ -26,11 +29,21 @@ app.use('/api/v1', routes);
 
 const PORT = process.env.PORT || 3000;
 
-if (require.main === module) {
-  server.listen(PORT, () => {
-    // Keep log lightweight; this is the primary entry point.
-    console.log(`API server listening on port ${PORT}`);
-  });
+export async function startServer() {
+  try {
+    await initDatabase();
+    server.listen(PORT, () => {
+      // Keep log lightweight; this is the primary entry point.
+      console.log(`API server listening on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server: database connection error', err.message);
+    process.exit(1);
+  }
 }
 
-module.exports = { app, server, io };
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startServer();
+}
+
+export { app, server, io };

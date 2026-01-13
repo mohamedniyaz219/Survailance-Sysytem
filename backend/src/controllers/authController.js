@@ -1,8 +1,8 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 // Handles authentication for a tenant-scoped user.
-async function login(req, res, next) {
+export async function login(req, res, next) {
   try {
     const { business_code: businessCode, email, password } = req.body || {};
 
@@ -43,5 +43,3 @@ async function login(req, res, next) {
     return next(err);
   }
 }
-
-module.exports = { login };
