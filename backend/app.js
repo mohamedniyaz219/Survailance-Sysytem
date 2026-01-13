@@ -32,6 +32,7 @@ const PORT = process.env.PORT || 3000;
 export async function startServer() {
   try {
     await initDatabase();
+    console.log('Database connected successfully');
     server.listen(PORT, () => {
       // Keep log lightweight; this is the primary entry point.
       console.log(`API server listening on port ${PORT}`);
