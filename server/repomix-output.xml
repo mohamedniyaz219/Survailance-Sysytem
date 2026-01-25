@@ -1,0 +1,1344 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+config/
+  config.cjs
+  config.js
+  database.js
+migrations/
+  202601200108-setup-public-schema.cjs
+scripts/
+  create-tenant.js
+src/
+  controllers/
+    adminController.js
+    aiController.js
+    authController.js
+    responderController.js
+    userController.js
+  middlewares/
+    authMiddleware.js
+    tenantResolver.js
+    uploadMiddleware.js
+  models/
+    public/
+      GlobalUser.js
+      ResponderTracking.js
+      Tenant.js
+      TenantAccess.js
+    tenant/
+      AIModel.js
+      AnomalyRule.js
+      Camera.js
+      CameraHealthLog.js
+      CrowdMetric.js
+      Incident.js
+      IncidentHistory.js
+      Personnel.js
+      ZoneRiskScore.js
+    index.js
+  routes/
+    adminRoutes.js
+    aiRoutes.js
+    authRoutes.js
+    index.js
+    officialRoutes.js
+    userRoutes.js
+  services/
+    tokenService.js
+    videoService.js
+.gitignore
+.sequelizerc
+package.json
+server.js
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="config/config.cjs">
+require('dotenv').config();
+
+const common = {
+  username: process.env.DB_USER || '',
+  password: process.env.DB_PASSWORD || null,
+  database: process.env.DB_NAME || 'survailance_sys',
+  host: process.env.DB_HOST || '127.0.0.1',
+  port: Number(process.env.DB_PORT) || 5432,
+  dialect: 'postgres',
+};
+
+module.exports = {
+  development: { ...common },
+  test: { ...common, database: `${common.database}_test` },
+  production: {
+    ...common,
+    dialectOptions: process.env.DB_SSL === 'true'
+      ? { ssl: { require: true, rejectUnauthorized: false } }
+      : {},
+  },
+};
+</file>
+
+<file path="config/config.js">
+import dotenv from 'dotenv';
+
+const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+const envFile = `.env.${env}`;
+
+dotenv.config({ path: envFile });
+dotenv.config();
+
+const common = {
+	username: process.env.DB_USER || '',
+	password: process.env.DB_PASSWORD || null,
+	database: process.env.DB_NAME || 'survailance_sys',
+	host: process.env.DB_HOST || '127.0.0.1',
+	port: Number(process.env.DB_PORT) || 5432,
+	dialect: 'postgres',
+};
+
+export default {
+	development: { ...common },
+	test: { ...common, database: `${common.database}_test` },
+	production: {
+		...common,
+		dialectOptions: process.env.DB_SSL === 'true'
+			? { ssl: { require: true, rejectUnauthorized: false } }
+			: {},
+	},
+};
+</file>
+
+<file path="config/database.js">
+import dotenv from 'dotenv';
+import { Sequelize } from 'sequelize';
+
+const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+const envFile = `.env.${env}`;
+
+dotenv.config({ path: envFile });
+dotenv.config();
+
+const {
+  DB_HOST,
+  DB_PORT = 5432,
+  DB_NAME,
+  DB_USER,
+  DB_PASSWORD,
+  DB_SSL,
+  DB_LOGGING,
+} = process.env;
+
+if (!DB_HOST || !DB_NAME || !DB_USER) {
+  throw new Error('Database environment variables are missing (DB_HOST, DB_NAME, DB_USER)');
+}
+
+export const sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASSWORD, {
+  host: DB_HOST,
+  port: Number(DB_PORT),
+  dialect: 'postgres',
+  logging: DB_LOGGING === 'true' ? console.log : false,
+  dialectOptions: DB_SSL === 'true' ? { ssl: { require: true, rejectUnauthorized: false } } : {},
+});
+
+export async function initDatabase() {
+  await sequelize.authenticate();
+
+  // Optional sync for local development. Set DB_SYNC=true to enable auto migrations.
+  if (process.env.DB_SYNC === 'true') {
+    await sequelize.sync({ alter: true });
+  }
+}
+</file>
+
+<file path="migrations/202601200108-setup-public-schema.cjs">
+'use strict';
+
+/** @type {import('sequelize-cli').Migration} */
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    const transaction = await queryInterface.sequelize.transaction();
+    
+    try {
+      // 1. Enable Extensions
+      await queryInterface.sequelize.query('CREATE EXTENSION IF NOT EXISTS postgis;', { transaction });
+      // await queryInterface.sequelize.query('CREATE EXTENSION IF NOT EXISTS vector;', { transaction });
+
+      // 2. Create Tenants Table
+      await queryInterface.createTable('tenants', {
+        id: { type: Sequelize.INTEGER, autoIncrement: true, primaryKey: true },
+        name: { type: Sequelize.STRING, allowNull: false },
+        business_code: { type: Sequelize.STRING, unique: true, allowNull: false },
+        schema_name: { type: Sequelize.STRING, unique: true, allowNull: false },
+        db_host: { type: Sequelize.STRING },
+        is_active: { type: Sequelize.BOOLEAN, defaultValue: true },
+        createdAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('NOW()') },
+        updatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('NOW()') }
+      }, { transaction, schema: 'public' });
+
+      // 3. Create Global Users (Citizens)
+      await queryInterface.createTable('global_users', {
+        id: { type: Sequelize.UUID, defaultValue: Sequelize.literal('gen_random_uuid()'), primaryKey: true },
+        phone: { type: Sequelize.STRING, unique: true, allowNull: false },
+        name: { type: Sequelize.STRING },
+        home_city: { type: Sequelize.STRING },
+        blood_group: { type: Sequelize.STRING(5) },
+        emergency_contact: { type: Sequelize.STRING(20) },
+        // Note: Using ARRAY(FLOAT) to represent vector in migration, 
+        // but PG will treat it as vector if cast correctly in queries.
+        face_vector: { type: Sequelize.ARRAY(Sequelize.FLOAT) }, 
+        createdAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('NOW()') },
+        updatedAt: { type: Sequelize.DATE, defaultValue: Sequelize.literal('NOW()') }
+      }, { transaction, schema: 'public' });
+
+      // 4. Create Tenant Access
+      await queryInterface.createTable('tenant_access', {
+        id: { type: Sequelize.INTEGER, autoIncrement: true, primaryKey: true },
+        official_email: { type: Sequelize.STRING, allowNull: false },
+        target_schema: { type: Sequelize.STRING, allowNull: false },
+        role: { type: Sequelize.ENUM('viewer', 'collaborator'), defaultValue: 'viewer' },
+        granted_by: { type: Sequelize.UUID },
+        expires_at: { type: Sequelize.DATE },
+        // No timestamps for this table in your model
+      }, { transaction, schema: 'public' });
+
+      // 5. Create Responder Tracking
+      await queryInterface.createTable('responder_tracking', {
+        id: { type: Sequelize.INTEGER, autoIncrement: true, primaryKey: true },
+        responder_id: { type: Sequelize.UUID, allowNull: false },
+        tenant_schema: { type: Sequelize.STRING, allowNull: false },
+        current_location: { type: Sequelize.GEOMETRY('POINT'), allowNull: false },
+        heading: { type: Sequelize.FLOAT },
+        speed: { type: Sequelize.FLOAT },
+        last_updated: { type: Sequelize.DATE, defaultValue: Sequelize.literal('NOW()') }
+      }, { transaction, schema: 'public' });
+
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  },
+
+  async down(queryInterface, Sequelize) {
+    const transaction = await queryInterface.sequelize.transaction();
+    try {
+      await queryInterface.dropTable({ tableName: 'responder_tracking', schema: 'public' }, { transaction });
+      await queryInterface.dropTable({ tableName: 'tenant_access', schema: 'public' }, { transaction });
+      await queryInterface.dropTable({ tableName: 'global_users', schema: 'public' }, { transaction });
+      await queryInterface.dropTable({ tableName: 'tenants', schema: 'public' }, { transaction });
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+};
+</file>
+
+<file path="scripts/create-tenant.js">
+// scripts/create-tenant.js
+import db from '../models/index.js'; // Import your ESM models
+
+const createTenant = async (tenantName, businessCode) => {
+  const schemaName = `tenant_${tenantName.toLowerCase().replace(/\s+/g, '_')}`;
+
+  console.log(`🚀 Starting setup for: ${tenantName} (${schemaName})...`);
+  
+  const t = await db.sequelize.transaction();
+
+  try {
+    // 1. Create the Entry in Public Tenant Table
+    const tenantEntry = await db.Tenant.create({
+      name: tenantName,
+      business_code: businessCode,
+      schema_name: schemaName
+    }, { transaction: t });
+
+    // 2. Create the Schema in Postgres
+    await db.sequelize.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}";`, { transaction: t });
+    console.log(`✅ Schema "${schemaName}" created.`);
+
+    // 3. Sync "Tenant" Models to this specific Schema
+    // We filter only the models that belong to the tenant folder
+    const tenantModels = [
+      'Personnel', 
+      'Camera', 
+      'Incident', 
+      'IncidentHistory', 
+      'AnomalyRule', 
+      'AIModel', 
+      'ZoneRiskScore', 
+      'CrowdMetric', 
+      'CameraHealthLog'
+    ];
+
+    for (const modelName of tenantModels) {
+      if (db[modelName]) {
+        // Sync creates the table in the DB
+        await db[modelName].sync({ schema: schemaName, force: false }); 
+        console.log(`   - Table ${modelName} synced.`);
+      } else {
+        console.warn(`    Model ${modelName} not found in DB object.`);
+      }
+    }
+
+    await t.commit();
+    console.log(`🎉 Tenant "${tenantName}" setup complete!`);
+    process.exit(0);
+
+  } catch (error) {
+    await t.rollback();
+    console.error(' Error creating tenant:', error);
+    process.exit(1);
+  }
+};
+
+// Usage: node scripts/create-tenant.js "Chennai City Police" "CHN-POL"
+const args = process.argv.slice(2);
+if (args.length < 2) {
+  console.log('Usage: node scripts/create-tenant.js <Name> <Code>');
+  process.exit(1);
+}
+
+createTenant(args[0], args[1]);
+</file>
+
+<file path="src/controllers/adminController.js">
+// Admin (dashboard) actions.
+export async function addCamera(req, res, next) {
+  try {
+    // TODO: persist RTSP URL and location into tenant-specific Cameras table.
+    return res.status(201).json({ message: 'Camera created' });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getAnalytics(req, res, next) {
+  try {
+    // TODO: aggregate incident counts per type/status for the tenant.
+    return res.json({ data: [] });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function manageOfficials(req, res, next) {
+  try {
+    if (req.method === 'DELETE') {
+      // TODO: delete official by id scoped to tenant.
+      return res.json({ message: 'Official removed' });
+    }
+    // TODO: create official scoped to tenant.
+    return res.status(201).json({ message: 'Official created' });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function liveFeed(req, res, next) {
+  try {
+    const { cameraId } = req.params;
+    // TODO: resolve HLS URL for the given camera within tenant schema.
+    return res.json({ cameraId, hls: null });
+  } catch (err) {
+    return next(err);
+  }
+}
+</file>
+
+<file path="src/controllers/aiController.js">
+// AI service hook: receives detections from Python, stores, and emits alerts.
+export async function receiveDetection(req, res, next) {
+  try {
+    const {
+      camera_id: cameraId,
+      detection_type: detectionType,
+      confidence,
+      snapshot,
+    } = req.body || {};
+
+    if (!cameraId || !detectionType || typeof confidence !== 'number') {
+      return res.status(400).json({ error: 'camera_id, detection_type, and confidence are required' });
+    }
+
+    if (!req.tenantSchema || !req.businessCode) {
+      return res.status(500).json({ error: 'Tenant context not resolved' });
+    }
+
+    // TODO: insert incident into the tenant schema (e.g., schema_chennai.Incidents).
+    const incident = {
+      cameraId,
+      detectionType,
+      confidence,
+      snapshot: snapshot || null,
+      schema: req.tenantSchema,
+      source: 'AI',
+      status: 'Detected',
+      createdAt: new Date().toISOString(),
+    };
+
+    // Broadcast to tenant-specific room so dashboard and apps receive immediately.
+    if (req.io) {
+      const room = req.tenantSchema || req.businessCode;
+      req.io.to(room).emit('ALERT', incident);
+    }
+
+    return res.status(201).json({ message: 'Detection received', incident });
+  } catch (err) {
+    return next(err);
+  }
+}
+</file>
+
+<file path="src/controllers/authController.js">
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+// Handles authentication for a tenant-scoped user.
+export async function login(req, res, next) {
+  try {
+    const { business_code: businessCode, email, password } = req.body || {};
+
+    if (!businessCode || !email || !password) {
+      return res.status(400).json({ error: 'business_code, email, and password are required' });
+    }
+
+    if (!req.tenantSchema) {
+      return res.status(500).json({ error: 'Tenant schema not resolved' });
+    }
+
+    // TODO: replace with actual model lookup in the tenant schema (Officials/Admins table).
+    // const user = await getUserFromTenantSchema(req.tenantSchema, email);
+    const user = null;
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        businessCode: businessCode,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    return res.json({ token });
+  } catch (err) {
+    return next(err);
+  }
+}
+</file>
+
+<file path="src/controllers/responderController.js">
+// Responder (official app) actions.
+export async function getMyAlerts(req, res, next) {
+  try {
+    // TODO: fetch incidents for the responder's zone within tenant schema.
+    return res.json({ alerts: [] });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function updateStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    // TODO: update incident status with validation of allowed transitions.
+    return res.json({ id, status });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function getNavigation(req, res, next) {
+  try {
+    const { id } = req.params;
+    // TODO: return coordinates/directions for the incident.
+    return res.json({ id, coordinates: null });
+  } catch (err) {
+    return next(err);
+  }
+}
+</file>
+
+<file path="src/controllers/userController.js">
+// Public user (crowdsourcing) actions.
+export async function reportIncident(req, res, next) {
+  try {
+    // TODO: persist manual incident with source "Manual" in tenant schema.
+    return res.status(201).json({ message: 'Incident reported' });
+  } catch (err) {
+    return next(err);
+  }
+}
+</file>
+
+<file path="src/middlewares/authMiddleware.js">
+import jwt from 'jsonwebtoken';
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  const businessCodeHeader = req.headers['x-business-code'];
+
+  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    return res.status(500).json({ error: 'JWT secret not configured' });
+  }
+
+  try {
+    const payload = jwt.verify(token, secret);
+
+    if (!businessCodeHeader) {
+      return res.status(400).json({ error: 'Missing x-business-code header' });
+    }
+
+    // Ensure token is scoped to the same tenant as the request header.
+    if (!payload.businessCode || payload.businessCode !== businessCodeHeader) {
+      return res.status(403).json({ error: 'Token not authorized for this business code' });
+    }
+
+    req.user = payload;
+    req.businessCode = businessCodeHeader;
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+export default authMiddleware;
+</file>
+
+<file path="src/middlewares/tenantResolver.js">
+import db from '../models/index.js';
+const { Tenant } = db;
+
+const tenantResolver = async (req, res, next) => {
+  try {
+    // 1. Get the Business Code from Headers (e.g., "CHN-POL-01")
+    const businessCode = req.headers['x-business-code'];
+
+    if (!businessCode) {
+      return res.status(400).json({ error: 'Missing x-business-code header' });
+    }
+
+    // 2. Find the Tenant in the Public Schema
+    const tenant = await Tenant.findOne({ 
+      where: { business_code: businessCode } 
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'Invalid Business Code' });
+    }
+
+    // 3. Attach the specific schema name to the Request object
+    // We will use this in Controllers to query the right tables
+    req.tenantSchema = tenant.schema_name; // e.g., "tenant_chennai"
+    req.tenantId = tenant.id;
+
+    next();
+  } catch (error) {
+    console.error('Tenant Resolution Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+export default tenantResolver;
+</file>
+
+<file path="src/middlewares/uploadMiddleware.js">
+const multer = require('multer');
+
+// Memory storage keeps payload in RAM; replace with disk/S3 as needed.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// Use as a route middleware: upload.single('image')
+module.exports = upload;
+</file>
+
+<file path="src/models/public/GlobalUser.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class GlobalUser extends Model {}
+
+  GlobalUser.init({
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    phone: { type: DataTypes.STRING, unique: true, allowNull: false },
+    name: { type: DataTypes.STRING },
+    home_city: { type: DataTypes.STRING },
+    blood_group: { type: DataTypes.STRING(5) },
+    emergency_contact: { type: DataTypes.STRING(20) },
+    
+    // PGVector: For Face ID matching
+    face_vector: { type: DataTypes.ARRAY(DataTypes.FLOAT) } 
+  }, {
+    sequelize,
+    modelName: 'GlobalUser',
+    schema: 'public',
+    tableName: 'global_users',
+    timestamps: true
+  });
+
+  return GlobalUser;
+};
+</file>
+
+<file path="src/models/public/ResponderTracking.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class ResponderTracking extends Model {}
+
+  ResponderTracking.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    responder_id: { type: DataTypes.UUID, allowNull: false }, 
+    tenant_schema: { type: DataTypes.STRING, allowNull: false },
+    current_location: { type: DataTypes.GEOMETRY('POINT'), allowNull: false },
+    heading: { type: DataTypes.FLOAT },
+    speed: { type: DataTypes.FLOAT },
+    last_updated: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+  }, {
+    sequelize,
+    modelName: 'ResponderTracking',
+    schema: 'public',
+    tableName: 'responder_tracking',
+    timestamps: false
+  });
+
+  return ResponderTracking;
+};
+</file>
+
+<file path="src/models/public/Tenant.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class Tenant extends Model {}
+
+  Tenant.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    name: { type: DataTypes.STRING, allowNull: false },
+    business_code: { type: DataTypes.STRING, unique: true, allowNull: false }, // "CHN-POL"
+    schema_name: { type: DataTypes.STRING, unique: true, allowNull: false },   // "tenant_chennai"
+    db_host: { type: DataTypes.STRING }, 
+    is_active: { type: DataTypes.BOOLEAN, defaultValue: true }
+  }, {
+    sequelize,
+    modelName: 'Tenant',
+    schema: 'public',
+    tableName: 'tenants',
+    timestamps: true
+  });
+
+  return Tenant;
+};
+</file>
+
+<file path="src/models/public/TenantAccess.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class TenantAccess extends Model {}
+
+  TenantAccess.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    official_email: { type: DataTypes.STRING, allowNull: false }, 
+    target_schema: { type: DataTypes.STRING, allowNull: false }, // "tenant_mumbai"
+    role: { 
+      type: DataTypes.ENUM('viewer', 'collaborator'), 
+      defaultValue: 'viewer' 
+    },
+    granted_by: { type: DataTypes.UUID }, 
+    expires_at: { type: DataTypes.DATE }
+  }, {
+    sequelize,
+    modelName: 'TenantAccess',
+    schema: 'public',
+    tableName: 'tenant_access',
+    timestamps: false
+  });
+
+  return TenantAccess;
+};
+</file>
+
+<file path="src/models/tenant/AIModel.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class AIModel extends Model {}
+
+  AIModel.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    name: { type: DataTypes.STRING }, // e.g., "YOLOv8-Weapons"
+    version: { type: DataTypes.STRING }, // "v1.2"
+    accuracy_score: { type: DataTypes.FLOAT },
+    is_active: { type: DataTypes.BOOLEAN, defaultValue: false }
+  }, {
+    sequelize,
+    modelName: 'AIModel',
+    tableName: 'ai_models',
+    timestamps: true
+  });
+
+  return AIModel;
+};
+</file>
+
+<file path="src/models/tenant/AnomalyRule.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class AnomalyRule extends Model {}
+
+  AnomalyRule.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    
+    // UPDATED: Rules corresponding to your incident types
+    rule_type: { 
+        type: DataTypes.ENUM(
+          'crowd_limit',        // For 'crowd'
+          'fight_duration',     // For 'fight' (how long until alert)
+          'loitering_time',     // For 'loitering'
+          'object_duration',    // For 'unattended_object'
+          'fire_confidence',    // For 'fire' (threshold)
+          'weapon_confidence'   // For 'weapon' (threshold)
+        ) 
+    },
+    
+    threshold_value: { type: DataTypes.INTEGER }, // e.g., 50 (people), 10 (seconds)
+    zone: { type: DataTypes.STRING },
+    severity: { type: DataTypes.ENUM('low', 'medium', 'high', 'critical') },
+    is_active: { type: DataTypes.BOOLEAN, defaultValue: true }
+  }, {
+    sequelize,
+    modelName: 'AnomalyRule',
+    tableName: 'anomaly_rules',
+    timestamps: true
+  });
+
+  return AnomalyRule;
+};
+</file>
+
+<file path="src/models/tenant/Camera.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class Camera extends Model {}
+
+  Camera.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    name: { type: DataTypes.STRING },
+    rtsp_url: { type: DataTypes.TEXT, allowNull: false },
+    location: { type: DataTypes.GEOMETRY('POINT'), allowNull: false },
+    location_name: { type: DataTypes.STRING },
+    zone: { type: DataTypes.STRING },
+    status: { 
+      type: DataTypes.ENUM('online', 'offline', 'maintenance'), 
+      defaultValue: 'online' 
+    }
+  }, {
+    sequelize,
+    modelName: 'Camera',
+    tableName: 'cameras',
+    timestamps: true
+  });
+
+  return Camera;
+};
+</file>
+
+<file path="src/models/tenant/CameraHealthLog.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class CameraHealthLog extends Model {}
+
+  CameraHealthLog.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    camera_id: { type: DataTypes.INTEGER },
+    status: { type: DataTypes.STRING }, // 'offline', 'lagging'
+    error_message: { type: DataTypes.TEXT },
+    latency_ms: { type: DataTypes.INTEGER },
+    checked_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+  }, {
+    sequelize,
+    modelName: 'CameraHealthLog',
+    tableName: 'camera_health_logs',
+    timestamps: false
+  });
+
+  return CameraHealthLog;
+};
+</file>
+
+<file path="src/models/tenant/CrowdMetric.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class CrowdMetric extends Model {}
+
+  CrowdMetric.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    camera_id: { type: DataTypes.INTEGER },
+    people_count: { type: DataTypes.INTEGER },
+    density_level: { type: DataTypes.STRING }, 
+    timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+  }, {
+    sequelize,
+    modelName: 'CrowdMetric',
+    tableName: 'crowd_metrics',
+    timestamps: false
+  });
+
+  return CrowdMetric;
+};
+</file>
+
+<file path="src/models/tenant/Incident.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class Incident extends Model {}
+
+  Incident.init({
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    
+    // UPDATED: Covers all 6 types you requested
+    type: { 
+      type: DataTypes.ENUM(
+        'fire', 
+        'weapon', 
+        'crowd', 
+        'fight', 
+        'loitering', 
+        'unattended_object'
+      ),
+      allowNull: false
+    },
+    
+    source: { 
+      type: DataTypes.ENUM('AI', 'APP_USER'), 
+      defaultValue: 'AI'
+    },
+
+    description: { type: DataTypes.TEXT },
+    location: { type: DataTypes.GEOMETRY('POINT'), allowNull: false },
+    media_url: { type: DataTypes.TEXT }, 
+    confidence: { type: DataTypes.FLOAT }, 
+    
+    status: { 
+      type: DataTypes.ENUM('new', 'assigned', 'resolved', 'false_alarm'),
+      defaultValue: 'new'
+    },
+    
+    priority: {
+       type: DataTypes.ENUM('high', 'medium', 'low'),
+       defaultValue: 'high'
+    },
+
+    camera_id: { type: DataTypes.INTEGER, allowNull: true },
+    reported_by: { type: DataTypes.UUID, allowNull: true }, 
+    assigned_responder_id: { type: DataTypes.UUID, allowNull: true } 
+    
+  }, {
+    sequelize,
+    modelName: 'Incident',
+    tableName: 'incidents',
+    timestamps: true
+  });
+
+  return Incident;
+};
+</file>
+
+<file path="src/models/tenant/IncidentHistory.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class IncidentHistory extends Model {}
+
+  IncidentHistory.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    incident_id: { type: DataTypes.UUID, allowNull: false },
+    action_by: { type: DataTypes.UUID }, 
+    action: { type: DataTypes.STRING }, 
+    prev_status: { type: DataTypes.STRING },
+    new_status: { type: DataTypes.STRING },
+    comment: { type: DataTypes.TEXT },
+    timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+  }, {
+    sequelize,
+    modelName: 'IncidentHistory',
+    tableName: 'incident_history',
+    timestamps: false
+  });
+
+  return IncidentHistory;
+};
+</file>
+
+<file path="src/models/tenant/Personnel.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class Personnel extends Model {}
+
+  Personnel.init({
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    badge_id: { type: DataTypes.STRING, unique: true },
+    name: { type: DataTypes.STRING, allowNull: false },
+    email: { type: DataTypes.STRING, unique: true, allowNull: false },
+    password_hash: { type: DataTypes.STRING, allowNull: false },
+    role: { 
+      type: DataTypes.ENUM('admin', 'responder', 'analyst', 'dispatcher'), 
+      defaultValue: 'responder' 
+    },
+    assigned_zone: { type: DataTypes.STRING },
+    fcm_token: { type: DataTypes.TEXT },
+    is_active: { type: DataTypes.BOOLEAN, defaultValue: true }
+  }, {
+    sequelize,
+    modelName: 'Personnel',
+    tableName: 'personnel',
+    timestamps: true
+  });
+
+  return Personnel;
+};
+</file>
+
+<file path="src/models/tenant/ZoneRiskScore.js">
+import { Model } from 'sequelize';
+
+export default (sequelize, DataTypes) => {
+  class ZoneRiskScore extends Model {}
+
+  ZoneRiskScore.init({
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    zone: { type: DataTypes.STRING },
+    risk_score: { type: DataTypes.INTEGER }, // 0-100
+    risk_factor: { type: DataTypes.STRING }, // e.g. "High Frequency Fights"
+    last_calculated: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+  }, {
+    sequelize,
+    modelName: 'ZoneRiskScore',
+    tableName: 'zone_risk_scores',
+    timestamps: false
+  });
+
+  return ZoneRiskScore;
+};
+</file>
+
+<file path="src/models/index.js">
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { Sequelize, DataTypes } from 'sequelize';
+import process from 'process';
+
+// Load config using createRequire for compatibility with JSON files
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const config = require('../config/config.json'); 
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const env = process.env.NODE_ENV || 'development';
+const dbConfig = config[env];
+const db = {};
+
+let sequelize;
+if (dbConfig.use_env_variable) {
+  sequelize = new Sequelize(process.env[dbConfig.use_env_variable], dbConfig);
+} else {
+  sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbConfig.password, dbConfig);
+}
+
+// Helper to load models from a specific directory dynamically
+const loadModelsFromDir = async (dirPath) => {
+  const files = fs.readdirSync(dirPath).filter(file => {
+    return (
+      file.indexOf('.') !== 0 && 
+      file !== 'index.js' && 
+      file.slice(-3) === '.js'
+    );
+  });
+
+  for (const file of files) {
+    const modelPath = path.join(dirPath, file);
+    const modelDef = await import(modelPath);
+    const model = modelDef.default(sequelize, DataTypes);
+    db[model.name] = model;
+  }
+};
+
+// 1. Load Public Models
+await loadModelsFromDir(path.join(__dirname, 'public'));
+
+// 2. Load Tenant Models
+await loadModelsFromDir(path.join(__dirname, 'tenant'));
+
+// 3. Setup Associations
+Object.keys(db).forEach(modelName => {
+  if (db[modelName].associate) {
+    db[modelName].associate(db);
+  }
+});
+
+db.sequelize = sequelize;
+db.Sequelize = Sequelize;
+
+export default db;
+</file>
+
+<file path="src/routes/adminRoutes.js">
+import express from 'express';
+import authMiddleware from '../middlewares/authMiddleware.js';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { addCamera, getAnalytics, manageOfficials, liveFeed } from '../controllers/adminController.js';
+
+const router = express.Router();
+
+router.use(authMiddleware, tenantResolver);
+
+router.post('/cameras', addCamera);
+router.get('/analytics', getAnalytics);
+router.post('/officials', manageOfficials);
+router.delete('/officials/:id', manageOfficials);
+router.get('/live-feed/:cameraId', liveFeed);
+
+export default router;
+</file>
+
+<file path="src/routes/aiRoutes.js">
+import express from 'express';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { receiveDetection } from '../controllers/aiController.js';
+
+const router = express.Router();
+
+router.use(tenantResolver);
+
+router.post('/detect', receiveDetection);
+
+export default router;
+</file>
+
+<file path="src/routes/authRoutes.js">
+import express from 'express';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { login } from '../controllers/authController.js';
+
+const router = express.Router();
+
+router.post('/login', tenantResolver, login);
+
+export default router;
+</file>
+
+<file path="src/routes/index.js">
+import express from 'express';
+
+import authRoutes from './authRoutes.js';
+import adminRoutes from './adminRoutes.js';
+import officialRoutes from './officialRoutes.js';
+import userRoutes from './userRoutes.js';
+import aiRoutes from './aiRoutes.js';
+
+const router = express.Router();
+
+router.get('/', (req, res) => {
+  res.json({ message: 'API root' });
+});
+
+router.use('/auth', authRoutes);
+router.use('/admin', adminRoutes);
+router.use('/official', officialRoutes);
+router.use('/user', userRoutes);
+router.use('/ai', aiRoutes);
+
+export default router;
+</file>
+
+<file path="src/routes/officialRoutes.js">
+import express from 'express';
+import authMiddleware from '../middlewares/authMiddleware.js';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { getMyAlerts, updateStatus, getNavigation } from '../controllers/responderController.js';
+
+const router = express.Router();
+
+router.use(authMiddleware, tenantResolver);
+
+router.get('/alerts', getMyAlerts);
+router.patch('/alerts/:id/status', updateStatus);
+router.get('/alerts/:id/navigation', getNavigation);
+
+export default router;
+</file>
+
+<file path="src/routes/userRoutes.js">
+import express from 'express';
+import tenantResolver from '../middlewares/tenantResolver.js';
+import { reportIncident } from '../controllers/userController.js';
+
+const router = express.Router();
+
+router.use(tenantResolver);
+
+router.post('/report', reportIncident);
+
+export default router;
+</file>
+
+<file path="src/services/tokenService.js">
+import jwt from 'jsonwebtoken';
+
+export function signToken(payload, options = {}) {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT secret not configured');
+  return jwt.sign(payload, secret, { expiresIn: '1h', ...options });
+}
+
+export function verifyToken(token) {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT secret not configured');
+  return jwt.verify(token, secret);
+}
+</file>
+
+<file path="src/services/videoService.js">
+import { spawn } from 'child_process';
+
+// Placeholder for spawning FFmpeg to convert RTSP to HLS/DASH/etc.
+export function spawnTranscoder(rtspUrl, outputDir) {
+  if (!rtspUrl || !outputDir) {
+    throw new Error('rtspUrl and outputDir are required');
+  }
+
+  // Example command; adjust flags/paths as needed for production.
+  const args = [
+    '-i', rtspUrl,
+    '-c:v', 'copy',
+    '-f', 'hls',
+    `${outputDir}/index.m3u8`,
+  ];
+
+  const proc = spawn('ffmpeg', args, { stdio: 'ignore' });
+  return proc;
+}
+</file>
+
+<file path=".gitignore">
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# Env
+.env
+*.env
+.env.*.local
+
+# Logs
+logs/
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage / build
+coverage/
+dist/
+build/
+.nyc_output/
+
+# Editor/OS
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
+
+# Transient
+*.tmp
+*.swp
+*.swo
+</file>
+
+<file path=".sequelizerc">
+const path = require('path');
+
+module.exports = {
+  config: path.resolve(__dirname, 'config', 'config.cjs'),
+  'models-path': path.resolve(__dirname, 'src', 'models'),
+  'seeders-path': path.resolve(__dirname, 'seeders'),
+  'migrations-path': path.resolve(__dirname, 'migrations'),
+};
+</file>
+
+<file path="package.json">
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "dev-start": "cross-env NODE_ENV=development nodemon server.js",
+    "prod-start": "cross-env NODE_ENV=production nodemon server.js",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:seed": "sequelize-cli db:seed:all",
+    "db:seed:undo": "sequelize-cli db:seed:undo:all"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "fluent-ffmpeg": "^2.1.3",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
+    "pg": "^8.17.1",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.7",
+    "socket.io": "^4.8.1",
+    "umzug": "^3.8.2"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "nodemon": "^3.1.11",
+    "sequelize-cli": "^6.6.3"
+  }
+}
+</file>
+
+<file path="server.js">
+import 'dotenv/config';
+
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+import http from 'http';
+import { Server } from 'socket.io';
+import routes from './src/routes/index.js';
+import { initDatabase } from './config/database.js';
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
+
+app.use(cors());
+app.use(helmet());
+app.use(express.json());
+
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+app.use('/api/v1', routes);
+
+const PORT = process.env.PORT || 3000;
+
+export async function startServer() {
+  try {
+    await initDatabase();
+    console.log('Database connected successfully');
+    server.listen(PORT, () => {
+      // Keep log lightweight; this is the primary entry point.
+      console.log(`API server listening on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server: database connection error', err.message);
+    process.exit(1);
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startServer();
+}
+
+export { app, server, io };
+</file>
+
+</files>
