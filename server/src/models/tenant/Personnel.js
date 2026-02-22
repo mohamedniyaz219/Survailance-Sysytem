@@ -5,20 +5,26 @@ export default (sequelize, DataTypes) => {
 
   Personnel.init({
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-    badge_id: { type: DataTypes.STRING, unique: true },
+    
+    // Identity
     name: { type: DataTypes.STRING, allowNull: false },
     email: { type: DataTypes.STRING, unique: true, allowNull: false },
     password_hash: { type: DataTypes.STRING, allowNull: false },
+    badge_id: { type: DataTypes.STRING, unique: true }, // e.g. "CHN-POL-405"
+    
+    // Access Control
     role: { 
       type: DataTypes.ENUM('admin', 'responder', 'analyst', 'dispatcher'), 
       defaultValue: 'responder' 
     },
-    assigned_zone: { type: DataTypes.STRING },
-    fcm_token: { type: DataTypes.TEXT },
+    
+    // Operational
+    assigned_zone: { type: DataTypes.STRING }, // e.g., "T-Nagar"
+    fcm_token: { type: DataTypes.TEXT }, // For Push Notifications
     is_active: { type: DataTypes.BOOLEAN, defaultValue: true }
   }, {
     sequelize,
-    modelName: 'Personnel',
+    modelName: 'Personnel', // Renamed from 'User'
     tableName: 'personnel',
     timestamps: true
   });

@@ -26,6 +26,7 @@ module.exports = {
       await queryInterface.createTable('global_users', {
         id: { type: Sequelize.UUID, defaultValue: Sequelize.literal('gen_random_uuid()'), primaryKey: true },
         phone: { type: Sequelize.STRING, unique: true, allowNull: false },
+        password_hash: { type: Sequelize.STRING, allowNull: false },
         name: { type: Sequelize.STRING },
         home_city: { type: Sequelize.STRING },
         blood_group: { type: Sequelize.STRING(5) },

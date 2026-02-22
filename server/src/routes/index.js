@@ -1,5 +1,6 @@
 import express from 'express';
 
+// Import Route Files
 import authRoutes from './authRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import officialRoutes from './officialRoutes.js';
@@ -8,14 +9,24 @@ import aiRoutes from './aiRoutes.js';
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
-  res.json({ message: 'API root' });
+// Root Health Check
+router.get('/health', (req, res) => {
+  res.json({ status: 'ok', version: '1.0.0' });
 });
 
+// 1. Authentication (Login & Register)
 router.use('/auth', authRoutes);
+
+// 2. Admin Dashboard (Protected)
 router.use('/admin', adminRoutes);
+
+// 3. Official App (Responder)
 router.use('/official', officialRoutes);
+
+// 4. User App (Citizen Reporting)
 router.use('/user', userRoutes);
+
+// 5. AI Service Webhook
 router.use('/ai', aiRoutes);
 
 export default router;
