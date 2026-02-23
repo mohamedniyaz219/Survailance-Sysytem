@@ -4,11 +4,20 @@ import API from '../services/api';
 // Async Actions
 export const loginOfficial = createAsyncThunk('auth/login', async (credentials, { rejectWithValue }) => {
   try {
+    const businessCode = credentials?.business_code;
+    if (!businessCode) {
+      return rejectWithValue('Business code is required');
+    }
+
     // Matches your Backend Controller: loginOfficial
-    const response = await API.post('/auth/official/login', credentials);
+    const response = await API.post('/auth/official/login', credentials, {
+      headers: {
+        'x-business-code': businessCode,
+      },
+    });
     return response.data;
   } catch (err) {
-    return rejectWithValue(err.response.data.error);
+    return rejectWithValue(err?.response?.data?.error || 'Login failed');
   }
 });
 

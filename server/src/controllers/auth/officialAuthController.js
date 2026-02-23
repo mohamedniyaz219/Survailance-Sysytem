@@ -18,10 +18,8 @@ export async function loginOfficial(req, res, next) {
     const schema = req.tenantSchema; 
 
     // Look for the user in THAT schema
-    const user = await Personnel.findOne({
-      where: { email },
-      schema: schema
-    });
+    const tenantPersonnel = Personnel.schema(schema);
+    const user = await tenantPersonnel.findOne({ where: { email } });
 
     if (!user) return res.status(401).json({ error: 'User not found in this organization' });
 
@@ -59,32 +57,48 @@ export async function loginOfficial(req, res, next) {
 export async function registerTenant(req, res, next) {
   const t = await db.sequelize.transaction();
   try {
-    const { business_name, business_code, admin_email, admin_password, admin_name } = req.body;
+    const { business_name, business_code, admin_email, admin_password, admin_name } = req.body || {};
 
-    // ... (Same logic as previous answer: Check duplicate, Create Schema, Sync Tables) ...
-    // Note: I'm abbreviating here to save space, stick to the logic provided previously.
-    
+    if (!business_name || !business_code || !admin_email || !admin_password || !admin_name) {
+      await t.rollback();
+      return res.status(400).json({ error: 'Missing required fields for tenant registration' });
+    }
+
+    const normalizedBusinessCode = String(business_code).trim().toUpperCase();
+    const schemaName = `schema_${normalizedBusinessCode.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
     // 1. Validation & Check Duplicate in Public.Tenants
-    const existing = await Tenant.findOne({ where: { business_code } });
-    if(existing) { await t.rollback(); return res.status(409).json({error: 'Code taken'}); }
+    const existing = await Tenant.findOne({ where: { business_code: normalizedBusinessCode }, transaction: t });
+    if (existing) {
+      await t.rollback();
+      return res.status(409).json({ error: 'Code taken' });
+    }
 
-    // 2. Create Schema
-    const schemaName = `schema_${business_code.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-    await Tenant.create({ name: business_name, business_code, schema_name: schemaName }, { transaction: t });
-    await db.sequelize.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}";`, { transaction: t });
+    // 2. Create Schema and Tenant metadata
+    await db.sequelize.createSchema(schemaName, { transaction: t });
+    await Tenant.create(
+      { name: business_name, business_code: normalizedBusinessCode, schema_name: schemaName },
+      { transaction: t }
+    );
 
-    // 3. Sync Tables
+    // 3. Sync Tenant Tables inside same transaction
     const tenantModels = ['Personnel', 'Camera', 'Incident', 'IncidentHistory', 'AnomalyRule', 'AIModel', 'ZoneRiskScore', 'CrowdMetric', 'CameraHealthLog'];
-    for (const m of tenantModels) { if(db[m]) await db[m].sync({ schema: schemaName }); }
+    for (const modelName of tenantModels) {
+      if (db[modelName]) {
+        await db[modelName].schema(schemaName).sync({ transaction: t });
+      }
+    }
 
     // 4. Create Admin
     const hashedParams = await bcrypt.hash(admin_password, 10);
-    await Personnel.create({
-      name: admin_name, email: admin_email, password_hash: hashedParams, role: 'admin'
-    }, { schema: schemaName, transaction: t });
+    const tenantPersonnel = Personnel.schema(schemaName);
+    await tenantPersonnel.create(
+      { name: admin_name, email: admin_email, password_hash: hashedParams, role: 'admin' },
+      { transaction: t }
+    );
 
     await t.commit();
-    res.status(201).json({ message: 'Organization created', business_code });
+    res.status(201).json({ message: 'Organization created', business_code: normalizedBusinessCode });
 
   } catch (err) {
     await t.rollback();
