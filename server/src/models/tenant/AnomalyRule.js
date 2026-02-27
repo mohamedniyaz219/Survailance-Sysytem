@@ -1,26 +1,36 @@
 import { Model } from 'sequelize';
 
 export default (sequelize, DataTypes) => {
-  class AnomalyRule extends Model {}
+  class AnomalyRule extends Model {
+    static associate(models) {
+      AnomalyRule.belongsTo(models.Zone, { foreignKey: 'zone_id', as: 'zoneRef' });
+      AnomalyRule.belongsTo(models.Personnel, { foreignKey: 'created_by', as: 'createdBy' });
+    }
+  }
 
   AnomalyRule.init({
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    
-    // UPDATED: Rules corresponding to your incident types
-    rule_type: { 
-        type: DataTypes.ENUM(
-          'crowd_limit',        // For 'crowd'
-          'fight_duration',     // For 'fight' (how long until alert)
-          'loitering_time',     // For 'loitering'
-          'object_duration',    // For 'unattended_object'
-          'fire_confidence',    // For 'fire' (threshold)
-          'weapon_confidence'   // For 'weapon' (threshold)
-        ) 
-    },
-    
+
+    name: { type: DataTypes.STRING, allowNull: false },
+    rule_type: { type: DataTypes.STRING, allowNull: false },
     threshold_value: { type: DataTypes.INTEGER }, // e.g., 50 (people), 10 (seconds)
     zone: { type: DataTypes.STRING },
-    severity: { type: DataTypes.ENUM('low', 'medium', 'high', 'critical') },
+    zone_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'zones',
+        key: 'id'
+      }
+    },
+    created_by: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'personnel',
+        key: 'id'
+      }
+    },
     is_active: { type: DataTypes.BOOLEAN, defaultValue: true }
   }, {
     sequelize,

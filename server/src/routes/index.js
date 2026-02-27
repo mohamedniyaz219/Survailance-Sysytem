@@ -6,6 +6,7 @@ import adminRoutes from './adminRoutes.js';
 import officialRoutes from './officialRoutes.js';
 import userRoutes from './userRoutes.js';
 import aiRoutes from './aiRoutes.js';
+import { getAllActiveCameras } from '../controllers/internalController.js';
 
 const router = express.Router();
 
@@ -28,5 +29,7 @@ router.use('/user', userRoutes);
 
 // 5. AI Service Webhook
 router.use('/ai', aiRoutes);
+
+router.get('/internal/cameras', getAllActiveCameras);
 
 export default router;

@@ -1,7 +1,11 @@
 import { Model } from 'sequelize';
 
 export default (sequelize, DataTypes) => {
-  class IncidentHistory extends Model {}
+  class IncidentHistory extends Model {
+    static associate(models) {
+      IncidentHistory.belongsTo(models.Incident, { foreignKey: 'incident_id', as: 'incident' });
+    }
+  }
 
   IncidentHistory.init({
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },

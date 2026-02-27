@@ -2,8 +2,9 @@ import jwt from 'jsonwebtoken';
 
 export function signToken(payload, options = {}) {
   const secret = process.env.JWT_SECRET;
+  const expiresIn = process.env.JWT_EXPIRES_IN || '1d';
   if (!secret) throw new Error('JWT secret not configured');
-  return jwt.sign(payload, secret, { expiresIn: '1h', ...options });
+  return jwt.sign(payload, secret, { expiresIn, ...options });
 }
 
 export function verifyToken(token) {

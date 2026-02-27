@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs';
 import { signToken } from '../../services/tokenService.js';
 import db from '../../models/index.js';
+import { sendOrganizationRegistrationEmail } from '../../services/mailService.js';
+import { seedModelsForSchema } from '../../services/aiModelCatalogService.js';
 
-const { Personnel, Tenant } = db;
+const { Personnel, Tenant, AIModel } = db;
 
 // --- 1. OFFICIAL LOGIN (Admins & Responders) ---
 // Both use this because they exist in the 'Personnel' table of the tenant schema
@@ -82,12 +84,18 @@ export async function registerTenant(req, res, next) {
     );
 
     // 3. Sync Tenant Tables inside same transaction
-    const tenantModels = ['Personnel', 'Camera', 'Incident', 'IncidentHistory', 'AnomalyRule', 'AIModel', 'ZoneRiskScore', 'CrowdMetric', 'CameraHealthLog'];
+    const tenantModels = ['Zone', 'Personnel', 'Camera', 'Incident', 'IncidentHistory', 'AnomalyRule', 'AIModel', 'ZoneRiskScore', 'CrowdMetric', 'CameraHealthLog', 'UserReport'];
     for (const modelName of tenantModels) {
       if (db[modelName]) {
         await db[modelName].schema(schemaName).sync({ transaction: t });
       }
     }
+
+    await seedModelsForSchema({
+      AIModel,
+      schema: schemaName,
+      transaction: t
+    });
 
     // 4. Create Admin
     const hashedParams = await bcrypt.hash(admin_password, 10);
@@ -98,7 +106,24 @@ export async function registerTenant(req, res, next) {
     );
 
     await t.commit();
-    res.status(201).json({ message: 'Organization created', business_code: normalizedBusinessCode });
+
+    let emailStatus = 'sent';
+    try {
+      const result = await sendOrganizationRegistrationEmail({
+        to: admin_email,
+        adminName: admin_name,
+        businessName: business_name,
+        businessCode: normalizedBusinessCode
+      });
+      if (result?.skipped) {
+        emailStatus = 'skipped';
+      }
+    } catch (mailErr) {
+      emailStatus = 'failed';
+      console.error('Organization registration email failed:', mailErr.message);
+    }
+
+    res.status(201).json({ message: 'Organization created', business_code: normalizedBusinessCode, emailStatus });
 
   } catch (err) {
     await t.rollback();

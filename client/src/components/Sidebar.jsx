@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Video, AlertTriangle, Crosshair, 
-  Activity, Users, Settings, LogOut, ShieldAlert 
+  Activity, Users, Settings, LogOut, ShieldAlert, MapPinned, CalendarDays, Radar
 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { logout } from '../redux/authSlice';
@@ -41,9 +41,16 @@ export default function Sidebar() {
         <SidebarItem icon={LayoutDashboard} label="Dashboard" path="/dashboard" />
         <SidebarItem icon={Video} label="Live Wall" path="/dashboard/live" />
         <SidebarItem icon={AlertTriangle} label="Incidents" path="/dashboard/incidents" />
+        <SidebarItem icon={Crosshair} label="Map View" path="/dashboard/map" />
+        <SidebarItem icon={Activity} label="AI Model" path="/dashboard/ai-models" />
+        <SidebarItem icon={Users} label="User Reports" path="/dashboard/user-reports" />
         
         <div className="px-8 text-xs font-bold text-silver-300 uppercase tracking-wider mt-6 mb-2">Management</div>
         <SidebarItem icon={Users} label="Responders" path="/dashboard/responders" />
+        <SidebarItem icon={Users} label="Cameras" path="/dashboard/cameras" />
+        <SidebarItem icon={MapPinned} label="Zones" path="/dashboard/zones" />
+        <SidebarItem icon={Radar} label="Anomaly Rules" path="/dashboard/anomaly-rules" />
+        <SidebarItem icon={CalendarDays} label="Events" path="/dashboard/events" />
         <SidebarItem icon={Settings} label="Config" path="/dashboard/settings" />
       </div>
 

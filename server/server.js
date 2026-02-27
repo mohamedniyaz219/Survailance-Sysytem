@@ -4,6 +4,7 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import http from 'http';
+import path from 'path';
 import { Server } from 'socket.io';
 import routes from './src/routes/index.js';
 import { initDatabase } from './config/database.js';
@@ -15,6 +16,8 @@ const io = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(helmet());
 app.use(express.json());
+app.use('/hls', express.static(path.resolve(process.cwd(), 'hls')));
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 app.use((req, res, next) => {
   req.io = io;

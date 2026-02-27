@@ -1,10 +1,8 @@
-const multer = require('multer');
+import multer from 'multer';
 
-// Memory storage keeps payload in RAM; replace with disk/S3 as needed.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-// Use as a route middleware: upload.single('image')
-module.exports = upload;
+export default upload;
