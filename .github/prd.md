@@ -7,7 +7,7 @@
 ---
 
 ## 1. Executive Summary
-**Sentinel AI** is a next-generation surveillance platform designed to shift security operations from **Reactive** (reviewing footage after a crime) to **Proactive** (detecting threats before they escalate).
+**Surveillance.io** is a next-generation surveillance platform designed to shift security operations from **Reactive** (reviewing footage after a crime) to **Proactive** (detecting threats before they escalate).
 
 It utilizes advanced Computer Vision (YOLOv26) to analyze CCTV feeds in real-time for specific threats (Weapons, Fire, Fights, Crowds). It orchestrates a multi-tenant response system connecting **Command Centers**, **Field Responders**, and **Citizens** instantly.
 

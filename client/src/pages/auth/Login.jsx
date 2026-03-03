@@ -23,7 +23,7 @@ export default function Login() {
       <div className="bg-white rounded-[2rem] shadow-xl p-8 w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
             <ShieldAlert size={48} className="text-toasted-almond-500 mb-2" />
-            <h1 className="text-2xl font-black text-stone-brown-900">Sentinel Command</h1>
+            <h1 className="text-2xl font-black text-stone-brown-900">Surveillance.io</h1>
             <p className="text-silver-500 text-sm">Official Personnel Access Only</p>
         </div>
 

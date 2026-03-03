@@ -137,7 +137,7 @@ def process_stream(camera_info, model):
     print(f"🛑 Cam {camera_id} thread stopped.")
 
 def main():
-    print("🚀 Sentinel AI Engine Starting...")
+    print("🚀 Surveillance.io AI Engine Starting...")
     
     # 1. Load Model (Once, shared across threads)
     try:

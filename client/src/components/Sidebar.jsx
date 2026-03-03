@@ -33,7 +33,7 @@ export default function Sidebar() {
     <div className="w-64 bg-white h-full flex flex-col py-6 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 shrink-0">
       <div className="flex items-center gap-3 px-8 mb-10">
         <ShieldAlert size={28} className="text-toasted-almond-500" />
-        <span className="font-black text-xl text-stone-brown-900 tracking-tight">Sentinel AI</span>
+        <span className="font-black text-xl text-stone-brown-900 tracking-tight">Surveillance.io</span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
