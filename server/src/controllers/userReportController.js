@@ -1,10 +1,129 @@
 import db from '../models/index.js';
 import { reportIncident } from './userController.js';
 
-const { UserReport, Personnel, Event, Sequelize } = db;
+const { UserReport, Personnel, Event, Incident, Sequelize } = db;
 
 const ALLOWED_MEDIA_TYPES = new Set(['photo', 'video', 'unknown']);
 const ALLOWED_STATUS = new Set(['new', 'assigned', 'in_progress', 'resolved', 'rejected']);
+const INCIDENT_ALLOWED_TYPES = new Set(['fire', 'weapon', 'crowd', 'fight', 'accident']);
+
+function mapReportTypeToIncidentType(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (INCIDENT_ALLOWED_TYPES.has(normalized)) return normalized;
+
+  if (/fire|smoke|burn/.test(normalized)) return 'fire';
+  if (/weapon|gun|knife|armed/.test(normalized)) return 'weapon';
+  if (/fight|assault|violence|attack/.test(normalized)) return 'fight';
+  if (/accident|crash|collision/.test(normalized)) return 'accident';
+  return 'crowd';
+}
+
+function buildReportMarker(reportId) {
+  return `[USER_REPORT:${reportId}]`;
+}
+
+function normalizeReportLocation(report) {
+  const coordinates = report?.location?.coordinates;
+  if (Array.isArray(coordinates) && coordinates.length >= 2) {
+    const lng = Number(coordinates[0]);
+    const lat = Number(coordinates[1]);
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      return {
+        type: 'Point',
+        coordinates: [lng, lat]
+      };
+    }
+  }
+
+  return {
+    type: 'Point',
+    coordinates: [0, 0]
+  };
+}
+
+function buildIncidentDescriptionFromReport(report) {
+  const marker = buildReportMarker(report.id);
+  const description = String(report.description || '').trim();
+  const locationName = String(report.location_name || '').trim();
+  const eventRef = report.event_id ? `Event #${report.event_id}` : null;
+
+  const details = [description, locationName ? `Location: ${locationName}` : null, eventRef].filter(Boolean);
+  const body = details.join('\n\n');
+
+  return body ? `${body}\n\n${marker}` : marker;
+}
+
+async function findIncidentForReport(tenantIncident, report, transaction) {
+  const marker = buildReportMarker(report.id);
+  const detectedClassMarker = `user_report:${report.id}`;
+
+  try {
+    return await tenantIncident.findOne({
+      where: {
+        source: 'CITIZEN',
+        detected_class: detectedClassMarker
+      },
+      transaction
+    });
+  } catch (err) {
+    const message = String(err?.original?.message || err?.message || '').toLowerCase();
+    const isMissingDetectedClass = err?.original?.code === '42703' && message.includes('detected_class');
+    if (!isMissingDetectedClass) throw err;
+
+    return tenantIncident.findOne({
+      where: {
+        source: 'CITIZEN',
+        description: {
+          [Sequelize.Op.iLike]: `%${marker}%`
+        }
+      },
+      transaction
+    });
+  }
+}
+
+async function upsertIncidentForAssignedReport({ schema, report, responderId, transaction }) {
+  const tenantIncident = Incident.schema(schema);
+  const existingIncident = await findIncidentForReport(tenantIncident, report, transaction);
+  const location = normalizeReportLocation(report);
+
+  if (existingIncident) {
+    existingIncident.assigned_responder_id = responderId;
+    existingIncident.status = 'assigned';
+    existingIncident.location = existingIncident.location || location;
+    existingIncident.media_url = existingIncident.media_url || report.media_url || null;
+    existingIncident.reported_by = existingIncident.reported_by || report.global_user_id || null;
+    if (!existingIncident.description || !String(existingIncident.description).includes(buildReportMarker(report.id))) {
+      existingIncident.description = buildIncidentDescriptionFromReport(report);
+    }
+
+    await existingIncident.save({ transaction });
+    return existingIncident;
+  }
+
+  const createPayload = {
+    type: mapReportTypeToIncidentType(report.incident_type),
+    source: 'CITIZEN',
+    description: buildIncidentDescriptionFromReport(report),
+    location,
+    media_url: report.media_url || null,
+    status: 'assigned',
+    reported_by: report.global_user_id || null,
+    assigned_responder_id: responderId,
+    detected_class: `user_report:${report.id}`
+  };
+
+  try {
+    return await tenantIncident.create(createPayload, { transaction });
+  } catch (err) {
+    const message = String(err?.original?.message || err?.message || '').toLowerCase();
+    const isMissingDetectedClass = err?.original?.code === '42703' && message.includes('detected_class');
+    if (!isMissingDetectedClass) throw err;
+
+    const { detected_class, ...fallbackPayload } = createPayload;
+    return tenantIncident.create(fallbackPayload, { transaction });
+  }
+}
 
 function ensureAdmin(req, res) {
   if (!req.user || req.user.role !== 'admin') {
@@ -192,23 +311,50 @@ export async function assignUserReport(req, res, next) {
     const tenantUserReport = UserReport.schema(schema);
     const tenantPersonnel = Personnel.schema(schema);
 
-    const [report, responder] = await Promise.all([
-      tenantUserReport.findByPk(id),
-      tenantPersonnel.findOne({ where: { id: responderId, role: 'responder' } })
-    ]);
+    const transaction = await db.sequelize.transaction();
 
-    if (!report) return res.status(404).json({ error: 'User report not found' });
-    if (!responder) return res.status(404).json({ error: 'Responder not found' });
+    let report;
+    let responder;
+    let incident;
 
-    report.assigned_responder_id = responder.id;
-    report.assigned_at = new Date();
-    report.status = 'assigned';
-    await report.save();
+    try {
+      [report, responder] = await Promise.all([
+        tenantUserReport.findByPk(id, { transaction }),
+        tenantPersonnel.findOne({ where: { id: responderId, role: 'responder' }, transaction })
+      ]);
+
+      if (!report) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'User report not found' });
+      }
+      if (!responder) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Responder not found' });
+      }
+
+      report.assigned_responder_id = responder.id;
+      report.assigned_at = new Date();
+      report.status = 'assigned';
+      await report.save({ transaction });
+
+      incident = await upsertIncidentForAssignedReport({
+        schema,
+        report,
+        responderId: responder.id,
+        transaction
+      });
+
+      await transaction.commit();
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
 
     return res.json({
-      message: 'Responder assigned to report',
+      message: 'Responder assigned to report and incident queue updated',
       data: {
         id: report.id,
+        incident_id: incident?.id || null,
         assigned_responder_id: report.assigned_responder_id,
         assigned_responder_name: responder.name,
         status: report.status,
