@@ -1,31 +1,30 @@
-# Server Setup Guide
+# Server – Multi-tenant API
 
-This document explains the requirements and steps to run the backend server.
+## What this project contains
+
+- Express + Sequelize REST API with tenant-aware routing under `src/controllers`.
+- Sequelize migrations + seeders that bootstrap the `public` tenant, tenant access config, responder tracking, and PostGIS geometry support.
+- Middleware for authentication (`authMiddleware.js`), tenant resolution (`tenantResolver.js`), and multi-tenant asset uploads.
+- AI ingestion endpoint (`/api/v1/ai/detect`), dashboard/incident management routes, responder tracking, and anomaly rule APIs.
+
+## Status
+
+- Actively maintained for multi-tenant scenarios; migrations already expect PostGIS in the `public` schema.
+- Sequelize models are split between `public/` and `tenant/` under `src/models`.
+- Redis/Socket-based services exist but rely on the `server/config/redis.js` and `server/src/services/socketService.js` helpers.
 
 ## Requirements
 
-- Node.js (recommended: 20+)
-- npm
-- PostgreSQL (recommended: 14+)
-- PostGIS extension available in your PostgreSQL installation
+- Node.js 20+ (LTS preferred) and npm.
+- PostgreSQL 14+ with PostGIS and the `vector` extension (optional, but the face-vector column is declared as an array). Ensure the database user can create extensions.
+- Optional: Redis if you plan to enable WebSocket-based responder tracking updates.
 
-## 1) Install Dependencies
+## Environment configuration
 
-From the `server` folder:
+Create a `.env` file at `server/.env` (never commit secrets). The following values are required at minimum:
 
-```bash
-npm install
 ```
-
-## 2) Configure Environment
-
-Create/update `.env` in the `server` folder.
-
-Example:
-
-```env
 PORT=3000
-
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=survailance_system
@@ -33,104 +32,53 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 DB_SSL=false
 DB_LOGGING=false
-DB_SYNC=true
-
+DB_SYNC=false
 JWT_SECRET=replace-with-strong-secret
 ```
 
-## 3) Create Database
+Add `REDIS_URL` if you are running the real-time services and keep `DB_SYNC=true` only in disposable environments.
 
-Create the database defined in `DB_NAME`.
+## Setup steps
 
-```bash
-createdb survailance_system
-```
+1. Install dependencies:
+   ```bash
+   cd server
+   npm install
+   ```
+2. Prepare the PostgreSQL database (replace credentials as needed):
+   ```bash
+   createdb survailance_system
+   # or with explicit credentials
+   PGPASSWORD=postgres createdb -h localhost -p 5432 -U postgres survailance_system
+   ```
+3. Enable necessary extensions:
+   ```bash
+   psql -h localhost -p 5432 -U postgres -d survailance_system -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+   psql -h localhost -p 5432 -U postgres -d survailance_system -c "CREATE EXTENSION IF NOT EXISTS vector;" # optional
+   ```
+4. Run migrations and optional seed data:
+   ```bash
+   npm run db:migrate
+   npm run db:seed
+   ```
+5. Launch the API:
+   ```bash
+   npm run dev-start # nodemon + live reload in development
+   npm run prod-start # production-ready node process
+   ```
 
-If your PostgreSQL user needs explicit host/port/user:
+## Useful scripts
 
-```bash
-PGPASSWORD=postgres createdb -h localhost -p 5432 -U postgres survailance_system
-```
-
-## 4) Ensure PostGIS Is Available
-
-The initial migration uses geometry columns and requires PostGIS.
-
-### macOS (Homebrew)
-
-```bash
-brew install postgis
-```
-
-Verify extension availability:
-
-```bash
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d survailance_system -c "SELECT name, default_version FROM pg_available_extensions WHERE name='postgis';"
-```
-
-Expected output should include `postgis`.
-
-## 5) Run Migrations
-
-```bash
-npm run db:migrate
-```
-
-Optional seed data:
-
-```bash
-npm run db:seed
-```
-
-## 6) Start Server
-
-Development mode:
-
-```bash
-npm run dev-start
-```
-
-Production-like mode:
-
-```bash
-npm run prod-start
-```
-
-## Useful Scripts
-
-- `npm run start` - Start with Node directly
-- `npm run dev-start` - Start with nodemon in development mode
-- `npm run prod-start` - Start with nodemon in production mode
-- `npm run db:migrate` - Run migrations
-- `npm run db:migrate:undo` - Undo last migration
-- `npm run db:seed` - Run all seeders
-- `npm run db:seed:undo` - Undo all seeders
+- `npm run db:migrate`: Run all pending migrations.
+- `npm run db:migrate:undo`: Roll back the last migration batch.
+- `npm run db:seed`: Seed data (useful for tenants/identity archetypes).
+- `npm run db:seed:undo`: Undo seeded content.
+- `npm run dev-start`: Start the server with live reload.
+- `npm run prod-start`: Start using the compiled Node.js entry point.
 
 ## Troubleshooting
 
-### Error: `extension "postgis" is not available`
-
-Install PostGIS and retry migration:
-
-```bash
-brew install postgis
-npm run db:migrate
-```
-
-### Error: `database "survailance_system" does not exist`
-
-Create the database and rerun migration:
-
-```bash
-PGPASSWORD=postgres createdb -h localhost -p 5432 -U postgres survailance_system
-npm run db:migrate
-```
-
-### Error: `EADDRINUSE: address already in use :::3000`
-
-Port is busy. Kill the process or change `PORT` in `.env`.
-
-```bash
-lsof -i :3000
-kill -9 <PID>
-```
+- **PostGIS missing**: Install via Homebrew (`brew install postgis`) or your distro package manager, then rerun the SQL commands above.
+- **Database already exists error**: Drop the database (`dropdb survailance_system`) before recreating, or change `DB_NAME`.
+- **Port 3000 in use**: Adjust the `PORT` value or stop the conflicting service (`lsof -i :3000`).
+- **Redis connection refused**: Ensure `REDIS_URL` points to a running Redis instance when the WebSocket services are enabled.
