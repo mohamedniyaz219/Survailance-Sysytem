@@ -35,3 +35,50 @@ This repository houses the full multi-component surveillance platform. It combin
 - Keep environment variables outside of source control; the root `.env` files are ignored for each component.
 - When you change API contracts, sync the frontends (client + mobile) to avoid runtime failures.
 - Mobile apps bundle native dependencies; rerun `bundle exec pod install` inside `ios/` whenever native modules change.
+
+## API Reference
+
+Base prefix: `/api/v1` (mounted in `server/server.js`). Brief list of available APIs and their purpose:
+
+- **Health**: `GET /health` — server health check (root).
+- **API health**: `GET /api/v1/health` — API health + version.
+- **Internal Cameras**: `GET /api/v1/internal/cameras` — returns active cameras for the AI engine (used by `ai-engine-python`).
+
+- **Auth** (`/api/v1/auth`):
+	- `POST /api/v1/auth/official/login` — Official (admin/responder) login (requires `x-business-code` header / tenant context).
+	- `POST /api/v1/auth/official/register-tenant` — Register a new tenant (creates business code).
+	- `POST /api/v1/auth/user/login` — Citizen (public) login.
+	- `POST /api/v1/auth/user/register` — Citizen registration.
+
+- **Admin** (`/api/v1/admin`) — protected (requires admin auth + tenant context):
+	- Dashboard: `GET /stats`, `GET /recent`, `GET /dashboard-overview`.
+	- Live wall & streams: `GET /live-wall`, `GET /live-wall/timeline`, `GET /stream/:id`.
+	- Cameras: `GET /cameras`, `POST /cameras`, `PATCH /cameras/:id`, `DELETE /cameras/:id`, `GET /cameras/:id/stream`.
+	- Incidents: `GET /incidents`, `GET /incidents/:id`, `POST /incidents/:id/assign`, `PATCH /incidents/:id/verify`.
+	- Map: `GET /map-overview`.
+	- Zones: `GET /zones`, `GET /zones/options`, `POST /zones`, `PATCH /zones/:id`, `DELETE /zones/:id`.
+	- Responders: `GET /responders`, `GET /responders/options`, `POST /responders`, `PATCH /responders/:id`, `DELETE /responders/:id`.
+	- AI Models: `GET /ai-models`, `POST /ai-models/sync`, `PATCH /ai-models/:id/activate`.
+	- Events: `GET /events`, `POST /events`, `PATCH /events/:id`, `DELETE /events/:id`.
+	- User Reports: `GET /user-reports`, `POST /user-reports/:id/assign`.
+	- Crowd analytics: `GET /crowd-metrics`.
+	- Anomaly rules: `GET /anomaly-rules`, `POST /anomaly-rules`, `PATCH /anomaly-rules/:id`, `DELETE /anomaly-rules/:id`.
+
+- **Official (Responder)** (`/api/v1/official`):
+	- `GET /alerts` — list alerts for responder.
+	- `PATCH /alerts/:id/status` — update alert status.
+	- `GET /alerts/:id/navigation` — navigation instructions for an alert.
+	- `GET /events` — list events available to responders.
+
+- **User (Citizen)** (`/api/v1/user`) — citizen-facing APIs (protected by citizen auth):
+	- `POST /upload-media` — upload media (multipart field `media`).
+	- `POST /report` — submit a quick incident report.
+	- `POST /reports` — create a user report (detailed).
+	- `GET /events` — list public events.
+
+- **AI ingestion** (`/api/v1/ai`):
+	- `POST /ai/detect` — AI engine posts detection payloads here (requires `x-business-code` header; tenantResolver applies).
+
+Notes:
+- Many admin/official routes require tenant resolution via the `x-business-code` header and proper authentication middleware.
+- The AI engine uses `GET /api/v1/internal/cameras` to fetch camera list and `POST /api/v1/ai/detect` to push detections (see `ai-engine-python/main.py`).
